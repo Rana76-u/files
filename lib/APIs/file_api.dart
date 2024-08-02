@@ -3,11 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 
-Future<void> pickFiles() async {
+Future<void> pickFiles(String folderPath) async {
   FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
 
   for(int i=0; i<result!.files.length; i++){
-    await saveFile(result.files[i]);
+    await saveFile(result.files[i], folderPath);
   }
 }
 
@@ -16,7 +16,7 @@ Future<String> getAppDirectory() async {
   return directory.path;
 }
 
-Future<void> saveFile(PlatformFile file) async {
+Future<void> saveFile(PlatformFile file, String folderPath) async {
   const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
   if (file.path == null) {
@@ -25,7 +25,8 @@ Future<void> saveFile(PlatformFile file) async {
   }
 
   final appDir = await getAppDirectory();
-  final newFilePath = '$appDir/${file.name}';
+  //final newFilePath = '$appDir/${file.name}';
+  final newFilePath = folderPath.isEmpty ? '$appDir/${file.name}' : '$folderPath/${file.name}';
 
   final newFile = File(newFilePath);
   await newFile.writeAsBytes(await File(file.path!).readAsBytes());
@@ -34,12 +35,50 @@ Future<void> saveFile(PlatformFile file) async {
   await secureStorage.write(key: file.name, value: newFilePath);
 }
 
-Future<List<String>> getSavedFiles() async {
+/*Future<List<String>> getSavedFiles() async {
   const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
   final allKeys = await secureStorage.readAll();
   return allKeys.values.toList();
+}*/
+
+Future<List<String>> getSavedFilesAndFolders(String folderPath) async {
+  final directory = await getApplicationDocumentsDirectory();
+  String directoryPath = '';
+  if(folderPath == ''){
+    directoryPath = directory.path;
+    /*const FlutterSecureStorage secureStorage = FlutterSecureStorage();
+
+    final allKeys = await secureStorage.readAll();
+    return allKeys.values.toList();*/
+  }
+  else{
+    directoryPath = folderPath;
+  }
+
+  print(directoryPath);
+  final directoryContents = Directory(directoryPath).listSync();
+
+  final paths = directoryContents.map((entity) => entity.path).toList();
+  return paths;
+  print(directoryPath);
+
+  //final directoryPath = folderPath; //${directory.path}/ok
+
 }
+
+/*Stream<List<String>> getSavedFilesStream() async* {
+  const FlutterSecureStorage secureStorage = FlutterSecureStorage();
+
+  final allKeys = await secureStorage.readAll();
+  List<String> filePaths = [];
+
+  for (var file in allKeys.values) {
+    filePaths.add(file);
+    yield filePaths; // Yield the list with the new file added
+    ///await Future.delayed(const Duration(milliseconds: 500)); // Optional delay for demo purposes
+  }
+}*/
 
 Future<void> deleteFile(String fileName) async {
   const FlutterSecureStorage secureStorage = FlutterSecureStorage();

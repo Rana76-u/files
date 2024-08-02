@@ -1,189 +1,356 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:files/Widgets/file_preview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:open_file_plus/open_file_plus.dart';
-import '../../../APIs/file_api.dart';
 import '../../../APIs/file_size_formatter.dart';
-import '../../../APIs/share_selected_files.dart';
-import '../../../Widgets/file_preview.dart';
+import '../../../Bloc/Hidden Home Bloc/hidden_home_bloc.dart';
+import '../../../Bloc/Hidden Home Bloc/hidden_home_event.dart';
+import '../../../Bloc/Hidden Home Bloc/hidden_home_state.dart';
+import 'package:path/path.dart' as path;
 
-class HiddenHome extends StatefulWidget {
+class HiddenHome extends StatelessWidget {
   const HiddenHome({super.key});
 
   @override
-  State<HiddenHome> createState() => _HiddenHomeState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => HiddenHomeBloc(),
+      child: const HiddenHomeView(),
+    );
+  }
 }
 
-class _HiddenHomeState extends State<HiddenHome> {
+class HiddenHomeView extends StatefulWidget {
+  const HiddenHomeView({super.key,});
 
-  bool checkBoxVisibility = false;
-  bool isSelectAll = false;
-  List<String> selectedFiles = [];
+  @override
+  State<HiddenHomeView> createState() => _HiddenHomeViewState();
+}
+
+class _HiddenHomeViewState extends State<HiddenHomeView> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<HiddenHomeBloc>().add(LoadFiles());
+  }
+
+  TextEditingController folderNameController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-          title: const Text(
-              'Files',
-            style: TextStyle(
-              fontWeight: FontWeight.bold
+    return BlocBuilder<HiddenHomeBloc, HiddenHomeState>(
+      builder: (context, state) {
+        final savedFiles = state.files;
+        return PopScope(
+          canPop: false,
+          onPopInvoked: (didPop) {
+            if (state.folderPath != '') {
+              // Get the parent directory
+              String parentFolder = path.dirname(state.folderPath);
+              if(path.basename(parentFolder) == 'app_flutter'){
+                context.read<HiddenHomeBloc>().add(const ChangeFolderPath(''));
+              }
+              else{
+                context.read<HiddenHomeBloc>().add(ChangeFolderPath(parentFolder));
+              }
+
+            }
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              title: Text(
+                state.folderPath != '' ? '/${path.basename(state.folderPath)}' : '/root',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              actions: [
+                //delete btn
+                state.folderPath != '' ?
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext dialogueContext) {
+                        return AlertDialog(
+                          title: const Text("Confirm Delete"),
+                          content: const Text("Are you sure you want to delete?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                // Dismiss the dialog
+                                Navigator.pop(context);
+                              },
+                              child: const Text("Cancel"),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final navigator = Navigator.pop(dialogueContext);
+                                /*setState(() {
+                                _isLoading = true;
+                              });*/
+                                // Dismiss the dialog
+                                if (mounted) {
+                                  navigator;
+                                }
+                                // Perform the delete action
+                                context.read<HiddenHomeBloc>().add(DeleteFolder());
+                              },
+                              child: const Text("Delete"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: Icon(Icons.delete, color: Colors.red,),
+                  ),
+                )
+                    :
+                    const SizedBox(),
+                
+                //edit btn
+                state.folderPath != '' ?
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext dialogBuilderContext) {
+                        return SimpleDialog(
+                          title: const Text(
+                              'Edit Folder Name'
+                          ),
+                          contentPadding: const EdgeInsets.all(15),
+                          children: [
+                            textFieldWidget(folderNameController, 'Input Folder Name'),
+                            ElevatedButton(
+                              onPressed: () async {
+                                final navigator = Navigator.pop(dialogBuilderContext);
+
+                                // Refresh the screen
+                                if (mounted) {
+                                  // Dismiss the dialog
+                                  navigator;
+                                }
+
+                                context.read<HiddenHomeBloc>().add(EditFolder(folderNameController.text));
+
+                                folderNameController.clear();
+                              },
+                              child: const Text(
+                                  'Submit'
+                              ),
+                            )
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child: Icon(Icons.edit, color: Colors.blue,),
+                  ),
+                )
+                    :
+                const SizedBox(),
+              ],
             ),
-          ),
-      ),
-      floatingActionButton: SizedBox(
-        height: 60,
-        width: 200,
-        child: FittedBox(
-          child: FloatingActionButton.extended(
-            onPressed: () async {
-              await pickFiles();
-              setState(() {});
-            },
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100.0),
-            ),
-            label: const Text(
-              'Add File',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15
+            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+            floatingActionButton: Padding(
+              padding: const EdgeInsets.only(bottom: 25),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  SizedBox(
+                    height: 60,
+                    child: FittedBox(
+                      child: FloatingActionButton.extended(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext dialogBuilderContext) {
+                              return SimpleDialog(
+                                title: const Text(
+                                    'CreateFolder'
+                                ),
+                                contentPadding: const EdgeInsets.all(15),
+                                children: [
+                                  textFieldWidget(folderNameController, 'Input Folder Name'),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      final navigator = Navigator.pop(dialogBuilderContext);
+
+                                      // Refresh the screen
+                                      if (mounted) {
+                                        // Dismiss the dialog
+                                        navigator;
+                                      }
+
+                                      context.read<HiddenHomeBloc>().add(CreateFolder(folderNameController.text));
+
+                                      folderNameController.clear();
+                                    },
+                                    child: const Text(
+                                        'Submit'
+                                    ),
+                                  )
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(100.0),
+                        ),
+                        label: const Text(
+                          'Create Folder',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        icon: const Icon(Icons.folder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 60,
+                    child: FittedBox(
+                      child: FloatingActionButton.extended(
+                        onPressed: () {
+                          context.read<HiddenHomeBloc>().add(PickFiles());
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(100.0),
+                        ),
+                        label: const Text(
+                          'Add File',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        icon: const Icon(Icons.add_circle_rounded),
+                      ),
+                    ),
+                  )
+                ],
               ),
             ),
-            icon: const Icon(
-                Icons.add_circle_rounded
-            ),
-          ),
-        ),
-      ),
-      bottomNavigationBar: checkBoxVisibility
-          ? BottomAppBar(
-        height: 75,
-        padding: const EdgeInsets.only(top: 6, left: 20,),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 3),
-                child: TextButton(
-                  onPressed: () {},
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: 25.0,
-                        height: 25.0,
-                        child: Checkbox(
-                          value: isSelectAll,
-                          onChanged: (value) {
-                            setState(() {
-                              isSelectAll = value!;
-                              if (!isSelectAll) {
-                                selectedFiles.clear();
-                              }
-                            });
-                          },
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+            bottomNavigationBar: BlocBuilder<HiddenHomeBloc, HiddenHomeState>(
+              builder: (context, state) {
+                if(!state.checkBoxVisibility){
+                  return const SizedBox();
+                }
+                return BottomAppBar(
+                  height: 75,
+                  padding: const EdgeInsets.only(top: 6, left: 20),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: TextButton(
+                            onPressed: () {
+                              context
+                                  .read<HiddenHomeBloc>()
+                                  .add(ToggleSelectAll(!state.isSelectAll));
+                            },
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  width: 25.0,
+                                  height: 25.0,
+                                  child: Checkbox(
+                                    value: state.isSelectAll,
+                                    onChanged: (value) {
+                                      context
+                                          .read<HiddenHomeBloc>()
+                                          .add(ToggleSelectAll(value!));
+                                    },
+                                    materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                ),
+                                const Text('Select All')
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const Text('Select All')
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: TextButton(
+                            onPressed: () {
+                              context.read<HiddenHomeBloc>().add(ExportFiles());
+                            },
+                            child: const Column(
+                              children: [
+                                Icon(Icons.import_export_rounded),
+                                Text('Export')
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: TextButton(
+                            onPressed: () {
+                              context.read<HiddenHomeBloc>().add(ShareFiles());
+                            },
+                            child: const Column(
+                              children: [
+                                Icon(Icons.share_rounded),
+                                Text('Share')
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: TextButton(
+                            onPressed: () {
+                              context.read<HiddenHomeBloc>().add(DeleteFiles());
+                            },
+                            child: const Column(
+                              children: [
+                                Icon(Icons.delete),
+                                Text('Delete')
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 2),
+                          child: TextButton(
+                            onPressed: () {
+                              context
+                                  .read<HiddenHomeBloc>()
+                                  .add(CancelSelection());
+                            },
+                            child: const Column(
+                              children: [
+                                Icon(Icons.cancel),
+                                Text('Cancel')
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 3),
-                child: TextButton(
-                  onPressed: () async {
-                    for(int i=0; i<selectedFiles.length; i++){
-                      await exportFileToDownloads(selectedFiles[i].split('/').last);
-                    }
-                    setState(() {});
-                  },
-                  child: const Column(
-                    children: [
-                      Icon(Icons.import_export_rounded),
-                      Text('Export')
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 3),
-                child: TextButton(
-                  onPressed: () {
-                    shareFiles(selectedFiles);
-                  },
-                  child: const Column(
-                    children: [
-                      Icon(Icons.share_rounded),
-                      Text('Share')
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 3),
-                child: TextButton(
-                  onPressed: () async {
-                    for(int i=0; i<selectedFiles.length; i++){
-                      await deleteFile(selectedFiles[i].split('/').last);
-                    }
-                    setState(() {});
-                  },
-                  child: const Column(
-                    children: [
-                      Icon(Icons.delete),
-                      Text('Delete')
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      checkBoxVisibility = false;
-                      isSelectAll = false;
-                      selectedFiles.clear();
-                    });
-                  },
-                  child: const Column(
-                    children: [
-                      Icon(Icons.cancel),
-                      Text('Cancel')
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      )
-          : null,
-      body: SingleChildScrollView(
-        child: FutureBuilder<List<String>>(
-          future: getSavedFiles(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            }
-            else if (snapshot.hasError) {
-              return const Text('Error loading saved files');
-            }
-            else {
-              final savedFiles = snapshot.data ?? [];
-              return Column(
+                );
+              },
+            ),
+            body: SingleChildScrollView(
+              child: ListView(
+                shrinkWrap: true,
                 children: savedFiles.map((path) {
-                  final file = File(path);
+                  final isDirectory = Directory(path).existsSync();
 
-                  if(isSelectAll){
-                    selectedFiles.add(path);
+                  if (state.isSelectAll) {
+                    context.read<HiddenHomeBloc>().add(SelectFile(path));
                   }
 
                   return Column(
@@ -194,51 +361,63 @@ class _HiddenHomeState extends State<HiddenHome> {
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             Visibility(
-                              visible: checkBoxVisibility,
+                              visible: !isDirectory && state.checkBoxVisibility,
                               child: Checkbox(
-                                value: selectedFiles.contains(path),
+                                value: state.selectedFiles.contains(path),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15)
+                                  borderRadius: BorderRadius.circular(15),
                                 ),
                                 onChanged: (value) {
-                                  setState(() {
-                                    if(selectedFiles.contains(path)){
-                                      selectedFiles.remove(path);
-                                    }
-                                    else{
-                                      selectedFiles.add(path);
-                                    }
-                                  });
+                                  if (value == true) {
+                                    context
+                                        .read<HiddenHomeBloc>()
+                                        .add(SelectFile(path));
+                                  } else {
+                                    context
+                                        .read<HiddenHomeBloc>()
+                                        .add(DeselectFile(path));
+                                  }
                                 },
                               ),
                             ),
                             SizedBox(
                               width: 85,
-                              child: buildFilePreview(PlatformFile(
-                                name: file.path.split('/').last,
-                                path: file.path,
-                                size: file.lengthSync(),
+                              child: isDirectory
+                                  ? const Icon(Icons.folder)
+                                  : buildFilePreview(PlatformFile(
+                                name: File(path).path.split('/').last,
+                                path: File(path).path,
+                                size: File(path).lengthSync(),
                                 bytes: null,
                               )),
-                            )
+                            ),
                           ],
                         ),
                         title: Text(
-                          file.path.split('/').last,
+                          File(path).path.split('/').last,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        subtitle: Text(formatFileSize(file.lengthSync())),
-                        onTap: () => OpenFile.open(file.path),
-                        /*onLongPress: () async {
-                          await deleteFile(file.path.split('/').last);
-                          setState(() {
-                          });
-                        },*/
+                        subtitle: isDirectory
+                            ? const Text('Folder')
+                            : Text(
+                            formatFileSize(File(path).lengthSync())),
+                        onTap: () {
+                          if (!isDirectory) {
+                            OpenFile.open(File(path).path);
+                          }//if it is a folder
+                          else{
+                            context.read<HiddenHomeBloc>().add(ChangeFolderPath(path));
+                          }
+                        },
                         onLongPress: () {
-                          setState(() {
-                            checkBoxVisibility = true;
-                            selectedFiles.add(path);
-                          });
+                          if (!isDirectory) {
+                            context
+                                .read<HiddenHomeBloc>()
+                                .add(ToggleCheckboxVisibility());
+                            context
+                                .read<HiddenHomeBloc>()
+                                .add(SelectFile(path));
+                          }
                         },
                       ),
                       const Divider(
@@ -246,15 +425,47 @@ class _HiddenHomeState extends State<HiddenHome> {
                         indent: 110,
                         endIndent: 20,
                         thickness: 1,
-                      )
+                      ),
                     ],
                   );
                 }).toList(),
-              );
-            }
-          },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget textFieldWidget(TextEditingController textEditingController, String hint) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, top: 5),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+            minHeight: 60,
+            maxHeight: 150
+        ),
+        //height: 60,
+        child: TextField(
+          controller: textEditingController,
+          autofocus: true,
+          autocorrect: false,
+          maxLines: null,
+          decoration: InputDecoration(
+            focusedBorder: const OutlineInputBorder(borderSide: BorderSide.none),
+            enabledBorder: const OutlineInputBorder(borderSide: BorderSide.none),
+            prefixIcon: const Icon(
+              Icons.short_text_rounded,
+              color: Colors.grey,
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+            hintText: hint,
+          ),
+          cursorColor: Colors.black,
         ),
       ),
     );
   }
 }
+
