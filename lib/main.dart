@@ -19,8 +19,8 @@ void main() async {
   }
   else{
     await Hive.openBox<String>('userDetails');
-    addToHive('password', '75+12');
-    password = '75+12';
+    addToHive('password', '71×24');
+    password = '71×24';
   }
 
   HydratedBloc.storage = await HydratedStorage.build(

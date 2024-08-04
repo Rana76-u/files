@@ -9,12 +9,14 @@ import 'package:path/path.dart' as path;
 class HiddenHomeBloc extends Bloc<HiddenHomeEvent, HiddenHomeState> {
   HiddenHomeBloc()
       : super(const HiddenHomeState(
+    isLoading: true,
     checkBoxVisibility: false,
     isSelectAll: false,
     files: [],
     selectedFiles: [],
     folderPath: ''
   )) {
+    on<IsLoading>(_onIsLoading);
     on<ToggleCheckboxVisibility>(_onToggleCheckboxVisibility);
     on<ToggleSelectAll>(_onToggleSelectAll);
     on<SelectFile>(_onSelectFile);
@@ -31,14 +33,23 @@ class HiddenHomeBloc extends Bloc<HiddenHomeEvent, HiddenHomeState> {
     on<EditFolder>(_editFolder);
   }
 
+  void _onIsLoading(IsLoading event, Emitter<HiddenHomeState> emit) async {
+    emit(state.copyWith(isLoading: event.isLoading));
+  }
+
   Future<void> _loadFiles(LoadFiles event, Emitter<HiddenHomeState> emit) async {
     final files = await getSavedFilesAndFolders('');
-    emit(state.copyWith(files: files));
+    emit(state.copyWith(
+        isLoading: false,
+        files: files));
   }
 
   void _changeFolderPath(ChangeFolderPath event, Emitter<HiddenHomeState> emit) async {
     final files = await getSavedFilesAndFolders(event.path);
-    emit(state.copyWith(folderPath: event.path,  files: files));
+    emit(state.copyWith(
+        isLoading: false,
+        folderPath: event.path,
+        files: files));
   }
 
   void _deleteFolder(DeleteFolder event, Emitter<HiddenHomeState> emit) async {
@@ -47,7 +58,7 @@ class HiddenHomeBloc extends Bloc<HiddenHomeEvent, HiddenHomeState> {
     await deleteFolder(state.folderPath);
     final files = await getSavedFilesAndFolders(newFolderPath);
 
-    emit(state.copyWith(folderPath: newFolderPath,  files: files));
+    emit(state.copyWith(isLoading: false, folderPath: newFolderPath,  files: files));
   }
 
   void _editFolder(EditFolder event, Emitter<HiddenHomeState> emit) async {
@@ -58,12 +69,12 @@ class HiddenHomeBloc extends Bloc<HiddenHomeEvent, HiddenHomeState> {
 
     final files = await getSavedFilesAndFolders(newFolderPath);
 
-    emit(state.copyWith(folderPath: newFolderPath,  files: files));
+    emit(state.copyWith(isLoading: false, folderPath: newFolderPath,  files: files));
   }
 
   void _onPickFiles(PickFiles event, Emitter<HiddenHomeState> emit) async {
     await pickFiles(state.folderPath);
-    emit(state.copyWith(files:await getSavedFilesAndFolders(state.folderPath)));
+    emit(state.copyWith(isLoading: false, files:await getSavedFilesAndFolders(state.folderPath)));
   }
 
   void _onExportFiles(ExportFiles event, Emitter<HiddenHomeState> emit) async {
@@ -73,10 +84,14 @@ class HiddenHomeBloc extends Bloc<HiddenHomeEvent, HiddenHomeState> {
   }
 
   void _onDeleteFiles(DeleteFiles event, Emitter<HiddenHomeState> emit) async {
-    for (final file in state.selectedFiles) {
-      await deleteFile(file.split('/').last);
+    for (final filePath in state.selectedFiles) {
+      await deleteFileByPath(filePath); //file.split('/').last
     }
-    emit(state.copyWith(files: await getSavedFilesAndFolders(state.folderPath)));
+    emit(state.copyWith(
+        isLoading: false,
+        selectedFiles: [],
+        files: await getSavedFilesAndFolders(state.folderPath))
+    );
   }
 
   void _onToggleCheckboxVisibility(

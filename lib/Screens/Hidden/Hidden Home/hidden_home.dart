@@ -57,7 +57,14 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
           }
         }
 
-        return PopScope(
+        return state.isLoading ?
+        const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        )
+            :
+        PopScope(
           canPop: false,
           onPopInvoked: (didPop) {
             if (state.folderPath != '') {
@@ -65,9 +72,11 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
               String parentFolder = path.dirname(state.folderPath);
 
               if(path.basename(parentFolder) == 'root' || path.basename(parentFolder) == 'app_flutter'){
+                context.read<HiddenHomeBloc>().add(const IsLoading(true));
                 context.read<HiddenHomeBloc>().add(const ChangeFolderPath(''));
               }
               else{
+                context.read<HiddenHomeBloc>().add(const IsLoading(true));
                 context.read<HiddenHomeBloc>().add(ChangeFolderPath(parentFolder));
               }
             }
@@ -120,6 +129,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                                     }
 
                                     if(folderNameController.text.toLowerCase() != 'root'){
+                                      context.read<HiddenHomeBloc>().add(const IsLoading(true));
                                       context.read<HiddenHomeBloc>().add(EditFolder(folderNameController.text));
                                     }
                                     else{
@@ -166,6 +176,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                                       navigator;
                                     }
                                     // Perform the delete action
+                                    context.read<HiddenHomeBloc>().add(const IsLoading(true));
                                     context.read<HiddenHomeBloc>().add(DeleteFolder());
                                   },
                                   child: const Text("Delete"),
@@ -178,7 +189,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                       case 2:
                       // Change password
                         Get.to(
-                            () => const EditPass()
+                                () => const EditPass()
                         );
                         break;
                     }
@@ -186,20 +197,20 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                   itemBuilder: (context) => [
                     if (state.folderPath != '')
                       const PopupMenuItem(
-                      value: 0,
-                      child: ListTile(
-                        leading: Icon(Icons.edit),
-                        title: Text('Edit folder name'),
+                        value: 0,
+                        child: ListTile(
+                          leading: Icon(Icons.edit),
+                          title: Text('Edit folder name'),
+                        ),
                       ),
-                    ),
                     if (state.folderPath != '')
-                    const PopupMenuItem(
-                      value: 1,
-                      child: ListTile(
-                        leading: Icon(Icons.delete, color: Colors.red,),
-                        title: Text('Delete folder'),
+                      const PopupMenuItem(
+                        value: 1,
+                        child: ListTile(
+                          leading: Icon(Icons.delete, color: Colors.red,),
+                          title: Text('Delete folder'),
+                        ),
                       ),
-                    ),
                     const PopupMenuItem(
                       value: 2,
                       child: ListTile(
@@ -281,7 +292,9 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                       child: FloatingActionButton.extended(
                         heroTag: 'addFile',
                         onPressed: () {
+                          context.read<HiddenHomeBloc>().add(const IsLoading(true));
                           context.read<HiddenHomeBloc>().add(PickFiles());
+                          context.read<HiddenHomeBloc>().add(const IsLoading(false));
                         },
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(100.0),
@@ -346,11 +359,17 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                           child: TextButton(
                             onPressed: () {
                               context.read<HiddenHomeBloc>().add(ExportFiles());
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Files Saved Into Downloads Folder'))
+                              );
+
+                              context.read<HiddenHomeBloc>().add(CancelSelection());
                             },
                             child: const Column(
                               children: [
-                                Icon(Icons.import_export_rounded),
-                                Text('Export')
+                                Icon(Icons.save_rounded),
+                                Text('Save')
                               ],
                             ),
                           ),
@@ -373,6 +392,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                           padding: const EdgeInsets.only(right: 3),
                           child: TextButton(
                             onPressed: () {
+                              context.read<HiddenHomeBloc>().add(const IsLoading(true));
                               context.read<HiddenHomeBloc>().add(DeleteFiles());
                               context.read<HiddenHomeBloc>().add(ToggleCheckboxVisibility());
                               context.read<HiddenHomeBloc>().add(const ToggleSelectAll(false));
@@ -408,91 +428,105 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
               },
             ),
             body: SingleChildScrollView(
-              child: ListView(
-                shrinkWrap: true,
-                children: savedFiles.map((path) {
-                  final isDirectory = Directory(path).existsSync();
+              child: Column(
+                children: [
+                  ListView(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: savedFiles.map((path) {
+                      final isDirectory = Directory(path).existsSync();
+                      final file = File(path);
+                      final isFileExists = file.existsSync();
 
-                  if (state.isSelectAll) {
-                    context.read<HiddenHomeBloc>().add(SelectFile(path));
-                  }
+                      if (state.isSelectAll) {
+                        context.read<HiddenHomeBloc>().add(SelectFile(path));
+                      }
 
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Visibility(
-                              visible: !isDirectory && state.checkBoxVisibility,
-                              child: Checkbox(
-                                value: state.selectedFiles.contains(path),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
+                      if (!isDirectory && !isFileExists) {
+                        return const SizedBox.shrink(); // Skip rendering for non-existent files
+                      }
+
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                Visibility(
+                                  visible: !isDirectory && state.checkBoxVisibility,
+                                  child: Checkbox(
+                                    value: state.selectedFiles.contains(path),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    onChanged: (value) {
+                                      if (value == true) {
+                                        context
+                                            .read<HiddenHomeBloc>()
+                                            .add(SelectFile(path));
+                                      } else {
+                                        context
+                                            .read<HiddenHomeBloc>()
+                                            .add(DeselectFile(path));
+                                      }
+                                    },
+                                  ),
                                 ),
-                                onChanged: (value) {
-                                  if (value == true) {
-                                    context
-                                        .read<HiddenHomeBloc>()
-                                        .add(SelectFile(path));
-                                  } else {
-                                    context
-                                        .read<HiddenHomeBloc>()
-                                        .add(DeselectFile(path));
-                                  }
-                                },
-                              ),
+                                SizedBox(
+                                  width: 85,
+                                  child: isDirectory
+                                      ? const Icon(Icons.folder)
+                                      : buildFilePreview(PlatformFile(
+                                    name: File(path).path.split('/').last,
+                                    path: File(path).path,
+                                    size: File(path).lengthSync(),
+                                    bytes: null,
+                                  )),
+                                ),
+                              ],
                             ),
-                            SizedBox(
-                              width: 85,
-                              child: isDirectory
-                                  ? const Icon(Icons.folder)
-                                  : buildFilePreview(PlatformFile(
-                                name: File(path).path.split('/').last,
-                                path: File(path).path,
-                                size: File(path).lengthSync(),
-                                bytes: null,
-                              )),
+                            title: Text(
+                              File(path).path.split('/').last,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                        title: Text(
-                          File(path).path.split('/').last,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: isDirectory
-                            ? const Text('Folder')
-                            : Text(
-                            formatFileSize(File(path).lengthSync())),
-                        onTap: () {
-                          if (!isDirectory) {
-                            OpenFile.open(File(path).path);
-                          }//if it is a folder
-                          else{
-                            context.read<HiddenHomeBloc>().add(ChangeFolderPath(path));
-                          }
-                        },
-                        onLongPress: () {
-                          if (!isDirectory) {
-                            context
-                                .read<HiddenHomeBloc>()
-                                .add(ToggleCheckboxVisibility());
-                            context
-                                .read<HiddenHomeBloc>()
-                                .add(SelectFile(path));
-                          }
-                        },
-                      ),
-                      const Divider(
-                        height: 5,
-                        indent: 110,
-                        endIndent: 20,
-                        thickness: 1,
-                      ),
-                    ],
-                  );
-                }).toList(),
+                            subtitle: isDirectory
+                                ? const Text('Folder')
+                                : Text(
+                                formatFileSize(File(path).lengthSync())),
+                            onTap: () {
+                              if (!isDirectory) {
+                                OpenFile.open(File(path).path);
+                              }//if it is a folder
+                              else{
+                                context.read<HiddenHomeBloc>().add(const IsLoading(true));
+                                context.read<HiddenHomeBloc>().add(ChangeFolderPath(path));
+                              }
+                            },
+                            onLongPress: () {
+                              if (!isDirectory) {
+                                context
+                                    .read<HiddenHomeBloc>()
+                                    .add(ToggleCheckboxVisibility());
+                                context
+                                    .read<HiddenHomeBloc>()
+                                    .add(SelectFile(path));
+                              }
+                            },
+                          ),
+                          const Divider(
+                            height: 5,
+                            indent: 110,
+                            endIndent: 20,
+                            thickness: 1,
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 300,)
+                ],
               ),
             ),
           ),

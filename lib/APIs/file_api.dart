@@ -59,6 +59,7 @@ Future<List<String>> getSavedFilesAndFolders(String folderPath) async {
   final directoryContents = Directory(directoryPath).listSync();
 
   final paths = directoryContents.map((entity) => entity.path).toList();
+
   return paths;
 }
 
@@ -75,7 +76,7 @@ Future<List<String>> getSavedFilesAndFolders(String folderPath) async {
   }
 }*/
 
-Future<void> deleteFile(String fileName) async {
+/*Future<void> deleteFile(String fileName) async {
   const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
   // Retrieve the file path from secure storage
@@ -92,7 +93,33 @@ Future<void> deleteFile(String fileName) async {
     await file.delete();
     await secureStorage.delete(key: fileName);
   }
+}*/
+
+Future<void> deleteFileByPath(String filePath) async {
+  const FlutterSecureStorage secureStorage = FlutterSecureStorage();
+
+  final file = File(filePath);
+
+  if (await file.exists()) {
+    await file.delete();
+
+    // You may want to delete the file path from secure storage if it was saved there
+    // Find the key corresponding to the filePath and delete it
+    final allEntries = await secureStorage.readAll();
+    String? keyToDelete;
+
+    allEntries.forEach((key, value) {
+      if (value == filePath) {
+        keyToDelete = key;
+      }
+    });
+
+    if (keyToDelete != null) {
+      await secureStorage.delete(key: keyToDelete!);
+    }
+  }
 }
+
 
 Future<void> exportFileToDownloads(String fileName) async {
   const FlutterSecureStorage secureStorage = FlutterSecureStorage();

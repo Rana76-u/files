@@ -7,6 +7,15 @@ abstract class HiddenHomeEvent extends Equatable {
   List<Object> get props => [];
 }
 
+class IsLoading extends HiddenHomeEvent {
+  final bool isLoading;
+
+  const IsLoading(this.isLoading);
+
+  @override
+  List<Object> get props => [isLoading];
+}
+
 class ToggleCheckboxVisibility extends HiddenHomeEvent {}
 
 class ToggleSelectAll extends HiddenHomeEvent {
