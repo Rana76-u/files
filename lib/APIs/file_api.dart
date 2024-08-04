@@ -26,7 +26,7 @@ Future<void> saveFile(PlatformFile file, String folderPath) async {
 
   final appDir = await getAppDirectory();
   //final newFilePath = '$appDir/${file.name}';
-  final newFilePath = folderPath.isEmpty ? '$appDir/${file.name}' : '$folderPath/${file.name}';
+  final newFilePath = folderPath.isEmpty ? '$appDir/root/${file.name}' : '$folderPath/${file.name}';
 
   final newFile = File(newFilePath);
   await newFile.writeAsBytes(await File(file.path!).readAsBytes());
@@ -46,7 +46,7 @@ Future<List<String>> getSavedFilesAndFolders(String folderPath) async {
   final directory = await getApplicationDocumentsDirectory();
   String directoryPath = '';
   if(folderPath == ''){
-    directoryPath = directory.path;
+    directoryPath = '${directory.path}/root';
     /*const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
     final allKeys = await secureStorage.readAll();
@@ -56,15 +56,10 @@ Future<List<String>> getSavedFilesAndFolders(String folderPath) async {
     directoryPath = folderPath;
   }
 
-  print(directoryPath);
   final directoryContents = Directory(directoryPath).listSync();
 
   final paths = directoryContents.map((entity) => entity.path).toList();
   return paths;
-  print(directoryPath);
-
-  //final directoryPath = folderPath; //${directory.path}/ok
-
 }
 
 /*Stream<List<String>> getSavedFilesStream() async* {

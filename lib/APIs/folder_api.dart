@@ -7,7 +7,12 @@ Future<void> createFolder(String folderName, String directoryPath) async {
   final directory = await getApplicationDocumentsDirectory();
   String folderPath = '';
   if(directoryPath == ''){
-    folderPath = '${directory.path}/$folderName';
+    if(folderName == ''){
+      folderPath = '${directory.path}/root';
+    }
+    else{
+      folderPath = '${directory.path}/root/$folderName';
+    }
   }
   else{
     folderPath = '$directoryPath/$folderName';

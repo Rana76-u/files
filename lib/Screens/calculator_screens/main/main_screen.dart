@@ -1,10 +1,16 @@
+import 'dart:io';
+
+import 'package:files/APIs/folder_api.dart';
+import 'package:files/APIs/hive_api.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../APIs/calculation.dart';
 import '../../../Bloc/Calculator Logics/cubits/calculation/calculation_cubit.dart';
 import '../../../Bloc/Calculator Logics/cubits/history/history_cubit.dart';
-import '../../../Bloc/Calculator Logics/cubits/theme/theme_cubit.dart';
 import '../../../components/helpers/utils.dart';
+import '../../Hidden/Hidden Home/hidden_home.dart';
 
 class ButtonModel {
   final String operator;
@@ -59,7 +65,7 @@ class _MainScreenState extends State<MainScreen> {
     ButtonModel(operator: '+/-'),
     ButtonModel(operator: '0'),
     ButtonModel(operator: '.'),
-    ButtonModel(operator: '=', tooltip: 'Equal', size: 32.0, isBold: true),
+    ButtonModel(operator: '＝', tooltip: 'Equal', size: 32.0, isBold: true),
   ];
 
   @override
@@ -74,10 +80,6 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _setTheme() {
-    context.read<ThemeCubit>().onToggleTheme();
-  }
-
   @override
   Widget build(BuildContext context) {
     final histories =
@@ -87,9 +89,6 @@ class _MainScreenState extends State<MainScreen> {
     final question = calculationState.question;
     final answer = calculationState.answer;
     final isInitial = calculationState.isInitial;
-    final themeMode = context.select((ThemeCubit cubit) => cubit.state);
-    final themeIcon =
-        themeMode == ThemeMode.light ? Icons.brightness_4 : Icons.brightness_5;
 
     return BlocListener<CalculationCubit, CalculationState>(
       listener: (context, state) {
@@ -135,7 +134,7 @@ class _MainScreenState extends State<MainScreen> {
                                   text: question[index],
                                   style: TextStyle(
                                     color: !Utils.isNumber(question[index])
-                                        ? Theme.of(context).primaryColor
+                                        ? const Color(0xFF799e03)//Theme.of(context).primaryColor
                                         : null,
                                   ),
                                 ),
@@ -143,7 +142,8 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             textAlign: TextAlign.end,
                             style: const TextStyle(
-                              fontSize: 50,
+                                fontSize:  50,
+                              fontWeight: FontWeight.w300
                               /*increase1
                                   ? increase2
                                   ? 26.0
@@ -155,7 +155,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       if (answer != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 22.0),
+                          padding: const EdgeInsets.only(bottom: 45.0),
                           child: SelectableText.rich(
                             TextSpan(
                               children: [
@@ -168,9 +168,10 @@ class _MainScreenState extends State<MainScreen> {
                               ],
                             ),
                             textAlign: TextAlign.end,
-                            style: const TextStyle(
-                                fontSize: 32.0,
-                              color: Colors.grey
+                            style: TextStyle(
+                                fontSize: 28.0,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w300
                             ),
                           ),
                         ),
@@ -202,16 +203,21 @@ class _MainScreenState extends State<MainScreen> {
                                     _isHistoryVisible
                                         ? Icons.calculate
                                         : Icons.access_time_rounded,
-                                    color: Colors.grey,
+                                    color: Colors.grey.shade500,
+                                    size: 23,
                                   ),
                                 ),
                               ),
                               Tooltip(
-                                message: 'Switch Theme',
+                                message: 'Unit Converter',
                                 child: IconButton(
                                   splashRadius: 20.0,
-                                  onPressed: _setTheme,
-                                  icon: Icon(themeIcon, color: Colors.grey,),
+                                  onPressed: () {},
+                                  icon: const Icon(
+                                    Icons.add_chart_rounded,
+                                    color: Colors.grey,
+                                    size: 23,
+                                  ),
                                 ),
                               ),
                               Tooltip(
@@ -219,7 +225,9 @@ class _MainScreenState extends State<MainScreen> {
                                 child: IconButton(
                                   onPressed: () {},
                                   splashRadius: 20.0,
-                                  icon: const Icon(Icons.calculate_outlined, color: Colors.grey,),
+                                  icon: const Icon(Icons.calculate_outlined,
+                                    color: Colors.grey,
+                                    size: 23,),
                                 ),
                               ),
                             ],
@@ -230,13 +238,13 @@ class _MainScreenState extends State<MainScreen> {
                           child: IconButton(
                             splashRadius: 20.0,
                             disabledColor:
-                                Theme.of(context).primaryColor.withOpacity(0.4),
-                            color: Theme.of(context).primaryColor,
+                            const Color(0xFF799e03).withOpacity(0.4),
+                            color: const Color(0xFF799e03),//Theme.of(context).primaryColor,
                             onPressed: isInitial
                                 ? null
                                 : () =>
                                     context.read<CalculationCubit>().onDelete(),
-                            icon: const Icon(Icons.backspace_outlined, size: 20,),
+                            icon: const Icon(Icons.backspace_outlined, size: 17,),
                           ),
                         ),
                       ],
@@ -392,15 +400,16 @@ class __ButtonItemState extends State<_ButtonItem> {
     final isParentheses = operator == '()';
     final isDelete = operator == '⌫';
     final isClear = operator == 'C';
-    final isEqual = operator == '=';
+    final isEqual = operator == '＝';
     final color = isEqual
         ? Colors.white
         : isClear
-            ? Colors.red
-            : Utils.isNumber(operator)
-                ? Theme.of(context).textTheme.bodyMedium?.color
-                : Theme.of(context).primaryColor;
-    final backgroundColor = isEqual ? Theme.of(context).primaryColor
+        ? Colors.red
+        : Utils.isNumber(operator) || operator == '+/-'
+        ? Theme.of(context).textTheme.bodyMedium?.color
+        :  const Color(0xFF799e03);//Theme.of(context).primaryColor;
+
+    final backgroundColor = isEqual ? const Color(0xFF87b003)//Theme.of(context).primaryColor
         :
         isParentheses || isClear || (!Utils.isNumber(operator) && operator != '+/-' && operator != '.')
             ? Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.075)
@@ -408,8 +417,8 @@ class __ButtonItemState extends State<_ButtonItem> {
             Colors.white;
     //Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.1);
 
-    final size = widget.buttonModel.size;
-    final isBold = widget.buttonModel.isBold;
+    //final size = widget.buttonModel.size;
+    //final isBold = widget.buttonModel.isBold;
 
     return Tooltip(
       message: tooltip,
@@ -446,7 +455,21 @@ class __ButtonItemState extends State<_ButtonItem> {
               } else if (isClear) {
                 context.read<CalculationCubit>().onClear();
               } else if (isEqual) {
-                context.read<CalculationCubit>().onEqual();
+
+                if (context.read<CalculationCubit>().state.question.contains(password)) {
+
+                  final directory = await getApplicationDocumentsDirectory();
+                  final rootFolder = Directory('${directory.path}/root');
+                  //if the root directory exists then go, otherwise create the root folder first
+                  if(await rootFolder.exists() == false){
+                    await createFolder('', '');
+                  }
+
+                  Get.to(() => const HiddenHome());
+                }
+                else{
+                  context.read<CalculationCubit>().onEqual();
+                }
               } else {
                 context.read<CalculationCubit>().onAdd(operator);
               }
@@ -463,9 +486,10 @@ class __ButtonItemState extends State<_ButtonItem> {
                     duration: const Duration(milliseconds: 100),
                     style: TextStyle(
                       color: color,
-                      fontSize: size - (isHold ? 5 : 0),
+                      fontSize: 30 - (isHold ? 5 : 0), ///size - (isHold ? 5 : 0)
                       letterSpacing: isParentheses ? 8 : null,
-                      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                      //fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isEqual ? FontWeight.bold : FontWeight.normal
                     ),
                     child: Text(operator),
                   ),

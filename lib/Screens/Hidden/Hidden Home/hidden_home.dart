@@ -1,14 +1,18 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:files/Screens/Hidden/Edit%20Pass/edit_pass.dart';
 import 'package:files/Widgets/file_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
 import 'package:open_file_plus/open_file_plus.dart';
 import '../../../APIs/file_size_formatter.dart';
 import '../../../Bloc/Hidden Home Bloc/hidden_home_bloc.dart';
 import '../../../Bloc/Hidden Home Bloc/hidden_home_event.dart';
 import '../../../Bloc/Hidden Home Bloc/hidden_home_state.dart';
 import 'package:path/path.dart' as path;
+
+import '../../calculator_screens/main/main_screen.dart';
 
 class HiddenHome extends StatelessWidget {
   const HiddenHome({super.key});
@@ -43,20 +47,36 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
     return BlocBuilder<HiddenHomeBloc, HiddenHomeState>(
       builder: (context, state) {
         final savedFiles = state.files;
+
+        for(int i=0; i<savedFiles.length; i++){
+          if(path.basename(savedFiles[i]) == 'flutter_assets'){
+            savedFiles.removeAt(i);
+          }
+          if(path.basename(savedFiles[i]).contains('res_timestamp')){
+            savedFiles.removeAt(i);
+          }
+        }
+
         return PopScope(
           canPop: false,
           onPopInvoked: (didPop) {
             if (state.folderPath != '') {
               // Get the parent directory
               String parentFolder = path.dirname(state.folderPath);
-              if(path.basename(parentFolder) == 'app_flutter'){
+
+              if(path.basename(parentFolder) == 'root' || path.basename(parentFolder) == 'app_flutter'){
                 context.read<HiddenHomeBloc>().add(const ChangeFolderPath(''));
               }
               else{
                 context.read<HiddenHomeBloc>().add(ChangeFolderPath(parentFolder));
               }
-
             }
+
+            if(state.checkBoxVisibility){
+              context.read<HiddenHomeBloc>().add(ToggleCheckboxVisibility());
+              context.read<HiddenHomeBloc>().add(const ToggleSelectAll(false));
+            }
+
           },
           child: Scaffold(
             appBar: AppBar(
@@ -66,96 +86,129 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
-                //delete btn
-                state.folderPath != '' ?
-                GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext dialogueContext) {
-                        return AlertDialog(
-                          title: const Text("Confirm Delete"),
-                          content: const Text("Are you sure you want to delete?"),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                // Dismiss the dialog
-                                Navigator.pop(context);
-                              },
-                              child: const Text("Cancel"),
-                            ),
-                            TextButton(
-                              onPressed: () async {
-                                final navigator = Navigator.pop(dialogueContext);
-                                /*setState(() {
+                IconButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, MainScreen.routeName);
+                  },
+                  icon: const Icon(Icons.logout_rounded),
+                ),
+
+                PopupMenuButton<int>(
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 0:
+                      // Edit folder name
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext dialogBuilderContext) {
+                            return SimpleDialog(
+                              title: const Text(
+                                  'Edit Folder Name'
+                              ),
+                              contentPadding: const EdgeInsets.all(15),
+                              children: [
+                                textFieldWidget(folderNameController, 'Input Folder Name'),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    final navigator = Navigator.pop(dialogBuilderContext);
+
+                                    // Refresh the screen
+                                    if (mounted) {
+                                      // Dismiss the dialog
+                                      navigator;
+                                    }
+
+                                    if(folderNameController.text.toLowerCase() != 'root'){
+                                      context.read<HiddenHomeBloc>().add(EditFolder(folderNameController.text));
+                                    }
+                                    else{
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Folder name cannot be root')),
+                                      );
+                                    }
+
+                                    folderNameController.clear();
+                                  },
+                                  child: const Text(
+                                      'Submit'
+                                  ),
+                                )
+                              ],
+                            );
+                          },
+                        );
+                        break;
+                      case 1:
+                      // Delete folder
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext dialogueContext) {
+                            return AlertDialog(
+                              title: const Text("Confirm Delete"),
+                              content: const Text("Are you sure you want to delete?"),
+                              actions: [
+                                TextButton(
+                                  onPressed: () {
+                                    // Dismiss the dialog
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text("Cancel"),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final navigator = Navigator.pop(dialogueContext);
+                                    /*setState(() {
                                 _isLoading = true;
                               });*/
-                                // Dismiss the dialog
-                                if (mounted) {
-                                  navigator;
-                                }
-                                // Perform the delete action
-                                context.read<HiddenHomeBloc>().add(DeleteFolder());
-                              },
-                              child: const Text("Delete"),
-                            ),
-                          ],
+                                    // Dismiss the dialog
+                                    if (mounted) {
+                                      navigator;
+                                    }
+                                    // Perform the delete action
+                                    context.read<HiddenHomeBloc>().add(DeleteFolder());
+                                  },
+                                  child: const Text("Delete"),
+                                ),
+                              ],
+                            );
+                          },
                         );
-                      },
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Icon(Icons.delete, color: Colors.red,),
-                  ),
-                )
-                    :
-                    const SizedBox(),
-                
-                //edit btn
-                state.folderPath != '' ?
-                GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext dialogBuilderContext) {
-                        return SimpleDialog(
-                          title: const Text(
-                              'Edit Folder Name'
-                          ),
-                          contentPadding: const EdgeInsets.all(15),
-                          children: [
-                            textFieldWidget(folderNameController, 'Input Folder Name'),
-                            ElevatedButton(
-                              onPressed: () async {
-                                final navigator = Navigator.pop(dialogBuilderContext);
-
-                                // Refresh the screen
-                                if (mounted) {
-                                  // Dismiss the dialog
-                                  navigator;
-                                }
-
-                                context.read<HiddenHomeBloc>().add(EditFolder(folderNameController.text));
-
-                                folderNameController.clear();
-                              },
-                              child: const Text(
-                                  'Submit'
-                              ),
-                            )
-                          ],
+                        break;
+                      case 2:
+                      // Change password
+                        Get.to(
+                            () => const EditPass()
                         );
-                      },
-                    );
+                        break;
+                    }
                   },
-                  child: const Padding(
-                    padding: EdgeInsets.only(right: 10),
-                    child: Icon(Icons.edit, color: Colors.blue,),
-                  ),
-                )
-                    :
-                const SizedBox(),
+                  itemBuilder: (context) => [
+                    if (state.folderPath != '')
+                      const PopupMenuItem(
+                      value: 0,
+                      child: ListTile(
+                        leading: Icon(Icons.edit),
+                        title: Text('Edit folder name'),
+                      ),
+                    ),
+                    if (state.folderPath != '')
+                    const PopupMenuItem(
+                      value: 1,
+                      child: ListTile(
+                        leading: Icon(Icons.delete, color: Colors.red,),
+                        title: Text('Delete folder'),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 2,
+                      child: ListTile(
+                        leading: Icon(Icons.lock),
+                        title: Text('Change password'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -168,6 +221,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                     height: 60,
                     child: FittedBox(
                       child: FloatingActionButton.extended(
+                        heroTag: 'createFolder',
                         onPressed: () {
                           showDialog(
                             context: context,
@@ -189,7 +243,14 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                                         navigator;
                                       }
 
-                                      context.read<HiddenHomeBloc>().add(CreateFolder(folderNameController.text));
+                                      if(folderNameController.text.toLowerCase() != 'root'){
+                                        context.read<HiddenHomeBloc>().add(CreateFolder(folderNameController.text));
+                                      }
+                                      else{
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Folder name cannot be root')),
+                                        );
+                                      }
 
                                       folderNameController.clear();
                                     },
@@ -218,6 +279,7 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                     height: 60,
                     child: FittedBox(
                       child: FloatingActionButton.extended(
+                        heroTag: 'addFile',
                         onPressed: () {
                           context.read<HiddenHomeBloc>().add(PickFiles());
                         },
@@ -312,6 +374,8 @@ class _HiddenHomeViewState extends State<HiddenHomeView> {
                           child: TextButton(
                             onPressed: () {
                               context.read<HiddenHomeBloc>().add(DeleteFiles());
+                              context.read<HiddenHomeBloc>().add(ToggleCheckboxVisibility());
+                              context.read<HiddenHomeBloc>().add(const ToggleSelectAll(false));
                             },
                             child: const Column(
                               children: [

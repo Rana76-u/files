@@ -1,21 +1,32 @@
-import 'package:files/Screens/Hidden/Hidden%20Home/hidden_home.dart';
+import 'package:files/APIs/hive_api.dart';
+import 'package:files/Bloc/Hidden%20Home%20Bloc/hidden_home_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:path_provider/path_provider.dart';
-
 import 'Bloc/Calculator Logics/cubits/history/history_cubit.dart';
-import 'Bloc/Calculator Logics/cubits/theme/theme_cubit.dart';
-import 'Themes/app_theme.dart';
 import 'Widgets/app_router.dart';
 import 'components/custom_scroll_behavior.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+
+  if(Hive.isBoxOpen('userDetails')) {
+    password = getFromHive('password')!;
+  }
+  else{
+    await Hive.openBox<String>('userDetails');
+    addToHive('password', '75+12');
+    password = '75+12';
+  }
+
   HydratedBloc.storage = await HydratedStorage.build(
     storageDirectory: await getTemporaryDirectory(),
   );
+
   runApp(const MyApp());
 }
 
@@ -30,18 +41,18 @@ class MyApp extends StatelessWidget {
         BlocProvider<HistoryCubit>(
           create: (context) => HistoryCubit(),
         ),
-        BlocProvider<ThemeCubit>(
-          create: (context) => ThemeCubit(),
+        BlocProvider<HiddenHomeBloc>(
+          create: (context) => HiddenHomeBloc(),
         ),
       ],
       child: Builder(
         builder: (context) {
-          final themeMode = context.select((ThemeCubit cubit) => cubit.state);
 
-          return MaterialApp(
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: themeMode,
+          return GetMaterialApp(
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+              useMaterial3: true,
+            ),
             debugShowCheckedModeBanner: false,
             //title: Config.appName,
             onGenerateRoute: AppRouter().onGenerateRoute,
@@ -55,12 +66,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-/*return GetMaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-              useMaterial3: true,
-            ),
-            home: const HiddenHome(),
-          );*/
